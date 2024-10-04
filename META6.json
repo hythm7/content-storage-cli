@@ -1,0 +1,27 @@
+{
+  "auth": "zef:hythm",
+  "authors": [
+    "Haytham Elganiny"
+  ],
+  "build-depends": [
+  ],
+  "depends": [
+    "Config",
+    "EventSource::Client",
+    "Cro::HTTP::Client"
+  ],
+  "description": "Content Storage CLI",
+  "license": "Artistic-2.0",
+  "name": "content-storage-cli",
+  "perl": "6.d",
+  "provides": {
+  },
+  "resources": [
+  ],
+  "source-url": "",
+  "tags": [
+  ],
+  "test-depends": [
+  ],
+  "version": "0.0.1"
+}
