@@ -2,7 +2,12 @@
 
 use Config;
 use JSON::Fast;
+use Prettier::Table;
 use Cro::HTTP::Client;
+
+my %*SUB-MAIN-OPTS = :named-anywhere, :allow-no;
+
+my enum Status  <✓ ✗ ⚪ ⚠>;
 
 
 my class Config::Parser::JSON is Config::Parser {
@@ -32,8 +37,8 @@ my $config = Config.new(
     },
     verbose => Bool,
     session => {
-      userid    => Str,
-      sessionid => Str,
+      userid    => "",
+      sessionid => "",
     },
   },
 );
@@ -41,22 +46,16 @@ my $config = Config.new(
 
 $config.=read: $config-file, Config::Parser::JSON;
 
-
 my $api-base-uri = Cro::Uri::HTTP.parse: $config<storage><api><uri>;
 
 my $api-page  =  $config<storage><api><page>;
-my $api-limit =  $config<storage><api><limit>;
+my $limit     =  $config<storage><api><limit>;
 
 my $user    =  $config<session><userid>;
 my $session =  $config<session><sessionid>;
 
 
-my $config-verbose  =  $config<verbose>;
-
-# TODO: if verbose show details in a table, noverbose show identity only
-
-
-enum Keyword  <distributions distribution builds build users user my get search add meta update password download log delete register login logout>;
+my $verbose  =  $config<verbose>;
 
 
 my subset UUID of Str where /^
@@ -71,23 +70,27 @@ my subset Identity of Str where / ^ [ <-[ : ]>* ]+ %% ":" $ /;
 
 my subset ID where any( UUID, Identity );
 
-proto sub MAIN ( Keyword, Bool :$verbose = $config-verbose, | ) is export {
+enum Keyword  <distributions distribution builds build users user my get search add meta update password download log delete register login logout>;
+
+proto sub MAIN ( Keyword, | ) is export {
 
   CATCH {
+
     when X::Cro::HTTP::Error {
 
-        my %body = await .response.body;
+      my %body = await .response.body;
 
-        if %body {
-          http-error |%body;
-        } else {
-          note .message;
-        }
+      if %body {
+        http-error |%body;
+      } else {
+        note .message;
+      }
     }
+
     default { say .message }
   }
 
-    {*}
+  {*}
 }
 
 
@@ -95,9 +98,7 @@ multi sub MAIN (
 
   distributions,
 
-  Bool:D :$verbose = $config-verbose,
   UInt:D :$page    = $api-page,
-  UInt:D :$limit   = $api-limit
 
 ) {
 
@@ -107,17 +108,21 @@ multi sub MAIN (
 
   my @distribution = await $response.body;
 
-  .say for @distribution.map( *.<identity> );
-}
+  my @data = @distribution;
 
+  my @field-names = $verbose ?? <Identity Name Version Auth Api Created> !! 'Identity';
+
+  my $table = create-table :@data, :title<Distributions>, :sort-by<Identity>, :@field-names;
+
+  say $table;
+
+}
 
 multi sub MAIN (
 
   builds,
 
-  Bool:D :$verbose = $config-verbose,
   UInt:D :$page    = $api-page,
-  UInt:D :$limit   = $api-limit
 
 ) {
 
@@ -125,9 +130,25 @@ multi sub MAIN (
 
   my $response = await Cro::HTTP::Client.get: $uri.add-query( :$page, :$limit ), cookies => { :$session };
 
-  my @builds = await $response.body;
+  my @build = await $response.body;
 
-  .say for @builds.map( *.<identity> );
+  my @data = @build.map( -> %build {
+
+    %build<status> = Status( %build<status> );
+    %build<meta>   = Status( %build<meta> );
+    %build<test>   = Status( %build<test> );
+
+    %build;
+
+  } );
+
+
+  my @field-names = $verbose ?? <Status User Identity Meta Test Started Completed Id> !! <Status User Id>;
+
+  my $table = create-table :@data, :title<Builds>, :sort-by<User>, :@field-names;
+
+  say $table;
+
 }
 
 
@@ -135,9 +156,7 @@ multi sub MAIN (
 
   users,
 
-  Bool:D :$verbose = $config-verbose,
   UInt:D :$page    = $api-page,
-  UInt:D :$limit   = $api-limit
 
 ) {
 
@@ -147,7 +166,19 @@ multi sub MAIN (
 
   my @user = await $response.body;
 
-  .say for @user.map( *.<username> );
+  my @data = @user.map( -> %user {
+
+    %user<admin>   =  %user<admin> ?? '✓' !! '';
+
+    %user;
+
+  } );
+
+  my @field-names = $verbose ?? <Username FirstName LastName  Email Admin Created> !! <Username Admin Created>;
+
+  my $table = create-table :@data, :title<Users>, :sort-by<Username>, :@field-names;
+
+  say $table;
 
 }
 
@@ -157,9 +188,7 @@ multi sub MAIN (
   my,
   distributions,
 
-  Bool:D :$verbose = $config-verbose,
   UInt:D :$page    = $api-page,
-  UInt:D :$limit   = $api-limit
 
 ) {
 
@@ -171,7 +200,13 @@ multi sub MAIN (
 
   my @distribution = await $response.body;
 
-  .say for @distribution.map( *.<identity> );
+  my @data = @distribution;
+
+  my @field-names = $verbose ?? <Identity Name Version Auth Api Created> !! 'Identity';
+
+  my $table = create-table :@data, :title<Distributions>, :sort-by<Identity>, :@field-names;
+
+  say $table;
 
 }
 
@@ -180,9 +215,7 @@ multi sub MAIN (
   my,
   builds,
 
-  Bool:D :$verbose = $config-verbose,
   UInt:D :$page    = $api-page,
-  UInt:D :$limit   = $api-limit
 
 ) {
 
@@ -195,17 +228,128 @@ multi sub MAIN (
 
   my @build = await $response.body;
 
-  .say for @build.map( *.<identity> );
+  my @data = @build.map( -> %build {
+
+    %build<status> = Status( %build<status> );
+    %build<meta>   = Status( %build<meta> );
+    %build<test>   = Status( %build<test> );
+
+    %build;
+
+  } );
+
+
+  my @field-names = $verbose ?? <Status User Identity Meta Test Started Completed Id> !! <Status User Id>;
+
+  my $table = create-table :@data, :title<Builds>, :sort-by<User>, :@field-names;
+
+  say $table;
 
 }
 
 
 multi sub MAIN (
 
+  search,
+  distributions,
+
+  Str:D   $name,
+
+  UInt:D :$page    = $api-page,
+
+) {
+
+  my $uri =  $api-base-uri.add( ~distributions );
+
+  my $response = await Cro::HTTP::Client.get: $uri.add-query( :$name, :$page, :$limit ), cookies => { :$session };
+
+  my @distribution = await $response.body;
+
+  my @data = @distribution;
+
+  my @field-names = $verbose ?? <Identity Name Version Auth Api Created> !! 'Identity';
+
+  my $table = create-table :@data, :title<Distributions>, :sort-by<Identity>, :@field-names;
+
+  say $table;
+
+
+}
+
+multi sub MAIN (
+
+  search,
+  builds,
+
+  Str:D   $name,
+
+  UInt:D :$page    = $api-page,
+
+) {
+
+  my $uri =  $api-base-uri.add( ~builds );
+
+  my $response = await Cro::HTTP::Client.get: $uri.add-query( :$name, :$page, :$limit ), cookies => { :$session };
+
+
+  my @build = await $response.body;
+
+  my @data = @build.map( -> %build {
+
+    %build<status> = Status( %build<status> );
+    %build<meta>   = Status( %build<meta> );
+    %build<test>   = Status( %build<test> );
+
+    %build;
+
+  } );
+
+
+  my @field-names = $verbose ?? <Status User Identity Meta Test Started Completed Id> !! <Status User Id>;
+
+  my $table = create-table :@data, :title<Builds>, :sort-by<User>, :@field-names;
+
+  say $table;
+
+}
+
+multi sub MAIN (
+
+  search,
+  users,
+
+  Str:D   $name,
+
+  UInt:D :$page    = $api-page,
+
+) {
+
+  my $uri =  $api-base-uri.add( ~users );
+
+  my $response = await Cro::HTTP::Client.get: $uri.add-query( :$name, :$page, :$limit ), cookies => { :$session };
+
+  my @user = await $response.body;
+
+  my @data = @user.map( -> %user {
+
+    %user<admin>   =  %user<admin> ?? '✓' !! '';
+
+    %user;
+
+  } );
+
+  my @field-names = $verbose ?? <Username FirstName LastName  Email Admin Created> !! <Username Admin Created>;
+
+  my $table = create-table :@data, :title<Users>, :sort-by<Username>, :@field-names;
+
+  say $table;
+
+}
+
+multi sub MAIN (
+
   my,
   user,
-
-  Bool:D :$verbose = $config-verbose,
 
 ) {
 
@@ -218,78 +362,15 @@ multi sub MAIN (
 
   my %user = await $response.body;
 
-  say %user;
-}
+  %user<admin>   =  %user<admin> ?? '✓' !! '';
 
-multi sub MAIN (
+  my @data = %user.item;
 
-  search,
-  distributions,
+  my @field-names = $verbose ?? <Username FirstName LastName  Email Admin Created> !! <Username Admin Created>;
 
-  Str:D   $name,
+  my $table = create-table :@data, :title<Users>, :sort-by<Username>, :@field-names;
 
-  Bool:D :$verbose = $config-verbose,
-  UInt:D :$page    = $api-page,
-  UInt:D :$limit   = $api-limit,
-
-) {
-
-  my $uri =  $api-base-uri.add( ~distributions );
-
-  my $response = await Cro::HTTP::Client.get: $uri.add-query( :$name, :$page, :$limit ), cookies => { :$session };
-
-  my @distribution = await $response.body;
-
-  .say for @distribution.map( *.<identity> );
-
-
-}
-
-multi sub MAIN (
-
-  search,
-  builds,
-
-  Str:D   $name,
-
-  Bool:D :$verbose = $config-verbose,
-  UInt:D :$page    = $api-page,
-  UInt:D :$limit   = $api-limit,
-
-) {
-
-  my $uri =  $api-base-uri.add( ~builds );
-
-  my $response = await Cro::HTTP::Client.get: $uri.add-query( :$name, :$page, :$limit ), cookies => { :$session };
-
-
-  my @build = await $response.body;
-
-  .say for @build.map( *.<identity> );
-
-
-}
-
-multi sub MAIN (
-
-  search,
-  users,
-
-  Str:D   $name,
-
-  Bool:D :$verbose = $config-verbose,
-  UInt:D :$page    = $api-page,
-  UInt:D :$limit   = $api-limit,
-
-) {
-
-  my $uri =  $api-base-uri.add( ~users );
-
-  my $response = await Cro::HTTP::Client.get: $uri.add-query( :$name, :$page, :$limit ), cookies => { :$session };
-
-  my @user = await $response.body;
-
-  .say for @user.map( *.<username> );
+  say $table;
 
 }
 
@@ -300,8 +381,6 @@ multi sub MAIN (
   distribution,
 
   ID:D    $distribution,
-
-  Bool:D :$verbose = $config-verbose,
 
 ) {
 
@@ -318,8 +397,6 @@ multi sub MAIN (
 
   UUID:D  $build,
 
-  Bool:D :$verbose = $config-verbose,
-
 ) {
 
   my $uri =  $api-base-uri.add( ~builds );
@@ -335,8 +412,6 @@ multi sub MAIN (
 
   Str:D   $user,
 
-  Bool:D :$verbose = $config-verbose,
-
 ) {
 
   my $uri =  $api-base-uri.add( ~users );
@@ -351,8 +426,6 @@ multi sub MAIN (
   log,
 
   UUID:D   $build,
-
-  Bool:D :$verbose = $config-verbose,
 
 ) {
 
@@ -375,8 +448,6 @@ multi sub MAIN (
 
   Str:D :$password,
 
-  Bool:D :$verbose = $config-verbose,
-
 ) {
 
   my $uri =  $api-base-uri.add: users ~ "/$user/password";
@@ -398,8 +469,6 @@ multi sub MAIN (
 
   Bool:D :$admin,
 
-  Bool:D :$verbose = $config-verbose,
-
 ) {
 
   my $uri =  $api-base-uri.add: users ~ "/$user/admin";
@@ -419,8 +488,6 @@ multi sub MAIN (
 
   Str:D $password,
 
-  Bool:D :$verbose = $config-verbose,
-
 ) {
 
   samewith( update, user, $user, :$password );
@@ -433,8 +500,6 @@ multi sub MAIN (
   download,
 
   Identity:D   $identity,
-
-  Bool:D :$verbose = $config-verbose,
 
 ) {
 
@@ -456,11 +521,8 @@ multi sub MAIN (
 
   IO::Path:D( Str ) $archive,
 
-  Bool:D           :$verbose = $config-verbose,
-
 ) {
 
-  enum Status  <SUCCESS ERROR RUNNING UNKNOWN>;
 
   use EventSource::Client;
 
@@ -488,7 +550,7 @@ multi sub MAIN (
 
   my $id = %body<id>;
 
-  say "Build ID: $id";
+  say "Building: ｢$id｣";
 
   react {
 
@@ -502,21 +564,7 @@ multi sub MAIN (
 
       }
       elsif ( $event.type eq 'message' ) and ( %data<ID> eq $id ) {
-
-        #my %build = %data<build>;
-
-        #my $user  =         %build<user>;
-
-        #my $status = Status( %build<status> );
-        #my $meta   = Status( %build<meta> );
-        #my $test   = Status( %build<test> );
-
-        #my $started   = %build<started>;
-        #my $completed = %build<completed>;
-
-        #quietly say "$status $user %build<identity> Meta:$meta Test:$test Started:$started Completed:$completed";
-
-        done if %data<build><status> ~~ SUCCESS | ERROR;
+        done if Status( %data<build><status> ) ~~ any <✓ ✗>;
       }
 
     }
@@ -529,8 +577,6 @@ multi sub MAIN (
 
   Str:D $username,
   Str:D $password,
-
-  Bool:D :$verbose = $config-verbose,
 
 ) {
 
@@ -570,8 +616,6 @@ multi sub MAIN (
   Str:D :$lastname  = "",
   Str:D :$email     = "",
 
-  Bool:D :$verbose = $config-verbose,
-
 ) {
 
   my $uri =  $api-base-uri.add: "auth/register";
@@ -596,12 +640,21 @@ multi sub MAIN (
 
   logout,
 
-  Bool:D :$verbose = $config-verbose,
-
 ) {
 
  await Cro::HTTP::Client.get: $api-base-uri ~ 'auth/logout', cookies => { :$session };
 
 }
+
+my sub create-table ( Str:D :$title!, Str:D :$sort-by!, :@field-names!, :@data!  --> Prettier::Table:D ) {
+
+  my $table = Prettier::Table.new: :$title, :$sort-by, :@field-names, :align<l>;
+
+  @data.map( { $table.add-row: @field-names.map( -> $field { .{ $field.lc } } ) } );
+
+  $table;
+
+}
+
 
 my sub http-error ( Int:D :$code!, Str:D :$message! ) { note "Error: $code: $message" }
