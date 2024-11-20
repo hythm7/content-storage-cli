@@ -43,6 +43,7 @@ my $config = Config.new(
   },
 );
 
+die "$config-file does not exist!" unless $config-file.e;
 
 $config.=read: $config-file, Config::Parser::JSON;
 

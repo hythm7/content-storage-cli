@@ -14,6 +14,25 @@ zef install content-storage-cli
 # or using Pakku
 pakku add content-storage-cli
 ```
+Config file example:
+
+```bash
+> cat ~/.content-storage-cli/config.json
+{
+  "storage": {
+    "name": "my-storage",
+    "api": {
+      "uri": "https://content-storage.pakku.org/api/v1/",
+      "page": 1,
+      "limit": 20
+    }
+  },
+  "verbose": true
+}
+
+# Please replace uri with the required storage api uri.
+```
+
 
 Usage
 =====
@@ -54,26 +73,6 @@ content-storage-cli.raku register <username> <password> [--firstname=<Str>] [--l
 
 content-storage-cli.raku logout
 
-```
-
-Config
-======
-
-```bash
-cat ~/.content-storage-cli/config.json
-{
-  "storage": {
-    "name": "my-storage",
-    "api": {
-      "uri": "https://content-storage.pakku.org/api/v1/",
-      "page": 1,
-      "limit": 20
-    }
-  },
-  "verbose": true
-}
-
-# Replace uri with the storage api uri.
 ```
 
 Author
