@@ -1,6 +1,3 @@
 use Test;
-use content-storage-cli;
-
-pass "replace me";
 
 done-testing;
